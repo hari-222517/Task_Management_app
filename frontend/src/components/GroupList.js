@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { getGroups, createGroup } from '../api';
+import { getGroups, createGroup, deleteGroup } from '../api';
 
 function GroupList() {
   const [groups, setGroups] = useState([]);
@@ -23,7 +23,10 @@ function GroupList() {
 
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
+    if (!newGroupName.trim()) {
+      alert('Please provide group name.');
+      return;
+    }
     
     setIsCreating(true);
     try {
@@ -35,6 +38,17 @@ function GroupList() {
     } catch (error) {
       console.error('Error creating group:', error);
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId) => {
+    if (window.confirm('Are you sure you want to delete this group? This will also delete all members and tasks associated with it.')) {
+      try {
+        await deleteGroup(groupId);
+        fetchGroups();
+      } catch (error) {
+        console.error('Error deleting group:', error);
+      }
     }
   };
 
@@ -123,9 +137,6 @@ function GroupList() {
                 <span className="text-white/40 text-xs" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
                   Created {new Date(group.created_at).toLocaleDateString()}
                 </span>
-                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '1rem', height: '1rem', color: 'rgba(255,255,255,0.4)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
               </div>
             </div>
           </Link>

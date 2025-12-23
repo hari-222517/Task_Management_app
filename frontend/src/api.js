@@ -9,6 +9,7 @@ const apiClient = axios.create({
 export const getGroups = () => apiClient.get('/groups/');
 export const createGroup = (group) => apiClient.post('/groups/', group);
 export const getGroup = (groupId) => apiClient.get(`/groups/${groupId}`);
+export const deleteGroup = (groupId) => apiClient.delete(`/groups/${groupId}`);
 
 // Member API calls
 export const addMember = (groupId, member) => apiClient.post(`/groups/${groupId}/members/`, member);

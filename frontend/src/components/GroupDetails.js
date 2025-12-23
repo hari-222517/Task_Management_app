@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getGroup } from '../api';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { getGroup, deleteGroup } from '../api';
 import MemberList from './MemberList';
 import TaskList from './TaskList';
 
@@ -8,6 +8,7 @@ function GroupDetails() {
   const { groupId } = useParams();
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchGroupDetails = useCallback(async () => {
     try {
@@ -19,6 +20,17 @@ function GroupDetails() {
       setLoading(false);
     }
   }, [groupId]);
+
+  const handleDeleteGroup = async () => {
+    if (window.confirm('Are you sure you want to delete this group? This will also delete all members and tasks associated with it.')) {
+      try {
+        await deleteGroup(groupId);
+        navigate('/');
+      } catch (error) {
+        console.error('Error deleting group:', error);
+      }
+    }
+  };
 
   useEffect(() => {
     fetchGroupDetails();
@@ -83,7 +95,7 @@ function GroupDetails() {
                   <div className="flex items-center space-x-4 text-white/60 text-sm">
                     <span className="flex items-center">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2 2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       Created {new Date(group.created_at).toLocaleDateString()}
                     </span>
@@ -108,9 +120,16 @@ function GroupDetails() {
               )}
             </div>
             
-            <div className="ml-6">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-            </div>
+            <button
+              onClick={handleDeleteGroup}
+              className="px-4 py-2 rounded-lg border border-red-500/30 bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center"
+              title="Delete group"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0015.838 3L12 15.172l3.627-3.627A2 2 0 0115.838 21L17 7z" />
+              </svg>
+              Delete Group
+            </button>
           </div>
         </div>
       </div>

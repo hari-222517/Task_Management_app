@@ -11,8 +11,8 @@ class Group(Base):
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    members = relationship("Member", back_populates="group")
-    tasks = relationship("Task", back_populates="group")
+    members = relationship("Member", back_populates="group", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="group", cascade="all, delete-orphan")
 
 class Member(Base):
     __tablename__ = "members"
@@ -20,11 +20,11 @@ class Member(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(100), nullable=False)
-    group_id = Column(Integer, ForeignKey("groups.id"))
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
     group = relationship("Group", back_populates="members")
-    assigned_tasks = relationship("Task", back_populates="assigned_to")
+    assigned_tasks = relationship("Task", back_populates="assigned_to", cascade="all, delete-orphan")
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -33,8 +33,8 @@ class Task(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text)
     status = Column(String(50), default="pending")
-    assigned_to_id = Column(Integer, ForeignKey("members.id"))
-    group_id = Column(Integer, ForeignKey("groups.id"))
+    assigned_to_id = Column(Integer, ForeignKey("members.id", ondelete="SET NULL"))
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
     group = relationship("Group", back_populates="tasks")

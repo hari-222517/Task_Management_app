@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
 from models import Group, Member, Task
 from schemas import GroupCreate, GroupResponse, MemberCreate, MemberResponse, TaskCreate, TaskResponse
-from email_service import send_task_email_sync
+from email_service import send_task_email_sync, send_member_welcome_email, send_member_removal_email
 import uvicorn
 
 Base.metadata.create_all(bind=engine)
@@ -50,6 +50,22 @@ def get_group(group_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Group not found")
     return group
 
+@app.delete("/groups/{group_id}")
+def delete_group(group_id: int, db: Session = Depends(get_db)):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    # Delete in correct order to avoid foreign key constraints
+    # First delete tasks, then members, then group
+    db.query(Task).filter(Task.group_id == group_id).delete()
+    db.query(Member).filter(Member.group_id == group_id).delete()
+    
+    # Delete the group
+    db.delete(group)
+    db.commit()
+    return {"message": "Group deleted successfully"}
+
 # Member endpoints
 @app.post("/groups/{group_id}/members/", response_model=MemberResponse)
 def add_member_to_group(group_id: int, member: MemberCreate, db: Session = Depends(get_db)):
@@ -61,6 +77,13 @@ def add_member_to_group(group_id: int, member: MemberCreate, db: Session = Depen
     db.add(db_member)
     db.commit()
     db.refresh(db_member)
+    
+    # Send welcome email to new member
+    try:
+        send_member_welcome_email(member.email, member.name, group.name)
+    except Exception as e:
+        print(f"Failed to send welcome email: {e}")
+    
     return db_member
 
 @app.get("/groups/{group_id}/members/", response_model=list[MemberResponse])
@@ -77,8 +100,18 @@ def remove_member(member_id: int, db: Session = Depends(get_db)):
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
+    # Get group name for email
+    group = db.query(Group).filter(Group.id == member.group_id).first()
+    
     db.delete(member)
     db.commit()
+    
+    # Send removal email
+    try:
+        send_member_removal_email(member.email, member.name, group.name)
+    except Exception as e:
+        print(f"Failed to send removal email: {e}")
+    
     return {"message": "Member removed successfully"}
 
 # Task endpoints
