@@ -37,11 +37,12 @@ class TaskBase(BaseModel):
     status: str = "pending"
 
 class TaskCreate(TaskBase):
-    assigned_to_id: int
+    assigned_to_id: Optional[int] = None
+    assign_to_all: bool = False
 
 class TaskResponse(TaskBase):
     id: int
-    assigned_to_id: int
+    assigned_to_id: Optional[int]
     group_id: int
     created_at: datetime
     

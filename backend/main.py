@@ -82,34 +82,65 @@ def remove_member(member_id: int, db: Session = Depends(get_db)):
     return {"message": "Member removed successfully"}
 
 # Task endpoints
-@app.post("/groups/{group_id}/tasks/", response_model=TaskResponse)
+@app.post("/groups/{group_id}/tasks/", response_model=list[TaskResponse])
 def create_task(group_id: int, task: TaskCreate, db: Session = Depends(get_db)):
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     
-    member = db.query(Member).filter(Member.id == task.assigned_to_id).first()
-    if not member or member.group_id != group_id:
-        raise HTTPException(status_code=404, detail="Member not found in this group")
+    created_tasks = []
     
-    db_task = Task(
-        title=task.title,
-        description=task.description,
-        assigned_to_id=task.assigned_to_id,
-        group_id=group_id,
-        status=task.status
-    )
-    db.add(db_task)
+    if task.assign_to_all:
+        # Create task for all group members
+        members = db.query(Member).filter(Member.group_id == group_id).all()
+        for member in members:
+            db_task = Task(
+                title=task.title,
+                description=task.description,
+                assigned_to_id=member.id,
+                group_id=group_id,
+                status=task.status
+            )
+            db.add(db_task)
+            created_tasks.append(db_task)
+            
+            # Send email notification
+            try:
+                send_task_email_sync(member.email, task.title, task.description, member.name)
+            except Exception as e:
+                print(f"Failed to send email to {member.email}: {e}")
+    else:
+        # Create task for specific member
+        if not task.assigned_to_id:
+            raise HTTPException(status_code=400, detail="assigned_to_id is required when assign_to_all is False")
+            
+        member = db.query(Member).filter(Member.id == task.assigned_to_id).first()
+        if not member or member.group_id != group_id:
+            raise HTTPException(status_code=404, detail="Member not found in this group")
+        
+        db_task = Task(
+            title=task.title,
+            description=task.description,
+            assigned_to_id=task.assigned_to_id,
+            group_id=group_id,
+            status=task.status
+        )
+        db.add(db_task)
+        created_tasks.append(db_task)
+        
+        # Send email notification
+        try:
+            send_task_email_sync(member.email, task.title, task.description, member.name)
+        except Exception as e:
+            print(f"Failed to send email: {e}")
+    
     db.commit()
-    db.refresh(db_task)
     
-    # Send email notification
-    try:
-        send_task_email_sync(member.email, task.title, task.description, member.name)
-    except Exception as e:
-        print(f"Failed to send email: {e}")
+    # Refresh all created tasks to get their IDs
+    for db_task in created_tasks:
+        db.refresh(db_task)
     
-    return db_task
+    return created_tasks
 
 @app.get("/groups/{group_id}/tasks/", response_model=list[TaskResponse])
 def get_group_tasks(group_id: int, db: Session = Depends(get_db)):
@@ -117,7 +148,33 @@ def get_group_tasks(group_id: int, db: Session = Depends(get_db)):
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     
-    return db.query(Task).filter(Task.group_id == group_id).all()
+    tasks = db.query(Task).filter(Task.group_id == group_id).all()
+    
+    # Convert tasks to response format, handling None values
+    task_responses = []
+    for task in tasks:
+        task_dict = {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+            "assigned_to_id": task.assigned_to_id,
+            "group_id": task.group_id,
+            "created_at": task.created_at
+        }
+        task_responses.append(TaskResponse(**task_dict))
+    
+    return task_responses
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    db.delete(task)
+    db.commit()
+    return {"message": "Task deleted successfully"}
 
 @app.put("/tasks/{task_id}/status")
 def update_task_status(task_id: int, status: str, db: Session = Depends(get_db)):

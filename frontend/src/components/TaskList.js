@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getTasks, createTask, updateTaskStatus, getMembers } from '../api';
+import { getTasks, createTask, updateTaskStatus, getMembers, deleteTask } from '../api';
 
 function TaskList({ groupId }) {
   const [tasks, setTasks] = useState([]);
@@ -7,13 +7,16 @@ function TaskList({ groupId }) {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDesc, setNewTaskDesc] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
+  const [assignToAll, setAssignToAll] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     try {
       const response = await getTasks(groupId);
-      setTasks(response.data);
+      // Handle both single task and array of tasks
+      const tasksData = Array.isArray(response.data) ? response.data : [response.data];
+      setTasks(tasksData);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -35,21 +38,30 @@ function TaskList({ groupId }) {
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
-    if (!newTaskTitle.trim() || !assignedTo) {
-      alert('Please provide task title and assign it to a member.');
+    if (!newTaskTitle.trim()) {
+      alert('Please provide task title.');
+      return;
+    }
+    
+    if (!assignToAll && !assignedTo) {
+      alert('Please assign task to a member or select "Assign to all members".');
       return;
     }
     
     setIsCreating(true);
     try {
-      await createTask(groupId, { 
-        title: newTaskTitle, 
-        description: newTaskDesc, 
-        assigned_to_id: assignedTo 
-      });
+      const taskData = {
+        title: newTaskTitle,
+        description: newTaskDesc,
+        assign_to_all: assignToAll,
+        ...(assignToAll ? {} : { assigned_to_id: parseInt(assignedTo) })
+      };
+      
+      await createTask(groupId, taskData);
       setNewTaskTitle('');
       setNewTaskDesc('');
       setAssignedTo('');
+      setAssignToAll(false);
       setShowAddForm(false);
       setIsCreating(false);
       fetchTasks();
@@ -65,6 +77,17 @@ function TaskList({ groupId }) {
       fetchTasks();
     } catch (error) {
       console.error('Error updating task status:', error);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      try {
+        await deleteTask(taskId);
+        fetchTasks();
+      } catch (error) {
+        console.error('Error deleting task:', error);
+      }
     }
   };
 
@@ -121,15 +144,29 @@ function TaskList({ groupId }) {
               value={assignedTo} 
               onChange={(e) => setAssignedTo(e.target.value)} 
               className="input-field"
-              required
+              disabled={assignToAll}
+              required={!assignToAll}
+              style={{ color: 'white' }}
             >
               <option value="">Assign to member...</option>
               {members.map((member) => (
-                <option key={member.id} value={member.id}>
+                <option key={member.id} value={member.id} style={{ color: 'black' }}>
                   {member.name}
                 </option>
               ))}
             </select>
+            <div className="flex items-center space-x-2 mb-4">
+              <input
+                type="checkbox"
+                id="assignToAll"
+                checked={assignToAll}
+                onChange={(e) => setAssignToAll(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-white/10 border-white/20 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="assignToAll" className="text-white text-sm font-medium">
+                Assign to all group members
+              </label>
+            </div>
             <div className="flex space-x-3">
               <button 
                 type="submit" 
@@ -201,6 +238,15 @@ function TaskList({ groupId }) {
                     <option value="in_progress" className="bg-gray-800">In Progress</option>
                     <option value="completed" className="bg-gray-800">Completed</option>
                   </select>
+                  <button
+                    onClick={() => handleDeleteTask(task.id)}
+                    className="px-3 py-1 rounded-lg border border-red-500/30 bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                    title="Delete task"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0015.838 3L12 15.172l3.627-3.627A2 2 0 0115.838 21L17 7z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>

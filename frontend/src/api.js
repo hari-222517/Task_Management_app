@@ -19,3 +19,4 @@ export const removeMember = (memberId) => apiClient.delete(`/members/${memberId}
 export const createTask = (groupId, task) => apiClient.post(`/groups/${groupId}/tasks/`, task);
 export const getTasks = (groupId) => apiClient.get(`/groups/${groupId}/tasks/`);
 export const updateTaskStatus = (taskId, status) => apiClient.put(`/tasks/${taskId}/status?status=${status}`);
+export const deleteTask = (taskId) => apiClient.delete(`/tasks/${taskId}`);
